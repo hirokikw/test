@@ -9,7 +9,7 @@
 <body>
 <main class="page">
     <h1 th:text="${title}">あいさつメッセージ生成</h1>
-    <p class="lead">名前を登録し、バッチを実行すると「こんにちは、○○さん！」が作られます。</p>
+    <p class="lead">名前を登録し、バッチを実行すると「こんにちは、○○さん！」が作られます。不要な行は削除できます。</p>
 
     <section class="panel">
         <form id="register-form" class="register-form">
@@ -36,6 +36,7 @@
                     <th>メッセージ</th>
                     <th>登録日時</th>
                     <th>処理日時</th>
+                    <th>操作</th>
                 </tr>
                 </thead>
                 <tbody id="greeting-list"></tbody>

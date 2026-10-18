@@ -93,7 +93,7 @@ function renderGreetings(greetings) {
     if (!Array.isArray(greetings) || greetings.length === 0) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
-        cell.colSpan = 6;
+        cell.colSpan = 7;
         cell.className = "empty";
         cell.textContent = "登録データはありません。";
         row.append(cell);
@@ -108,9 +108,39 @@ function renderGreetings(greetings) {
             textCell(statusLabel(greeting.status)),
             textCell(greeting.message ? greeting.message : "未生成"),
             textCell(formatDateTime(greeting.createdAt)),
-            textCell(greeting.processedAt ? formatDateTime(greeting.processedAt) : "—")
+            textCell(greeting.processedAt ? formatDateTime(greeting.processedAt) : "—"),
+            deleteCell(greeting)
         );
         greetingList.append(row);
+    }
+}
+
+function deleteCell(greeting) {
+    const cell = document.createElement("td");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "delete-button";
+    button.textContent = "削除";
+    button.addEventListener("click", () => {
+        withBusy(button, () => deleteGreeting(greeting.id));
+    });
+    cell.append(button);
+    return cell;
+}
+
+async function deleteGreeting(id) {
+    try {
+        const response = await fetch("/api/greetings/" + encodeURIComponent(id), {
+            method: "DELETE"
+        });
+        if (!response.ok) {
+            showFeedback(await readErrorMessage(response), true);
+            return;
+        }
+        showFeedback("削除しました。", false);
+        await fetchAndRender();
+    } catch (error) {
+        showFeedback("通信に失敗しました。", true);
     }
 }
 

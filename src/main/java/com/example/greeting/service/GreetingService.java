@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.greeting.api.GreetingNotFoundException;
 import com.example.greeting.api.InvalidGreetingNameException;
 import com.example.greeting.api.dto.GreetingResponse;
 import com.example.greeting.api.validation.GreetingNameValidator;
@@ -15,7 +16,7 @@ import com.example.greeting.domain.GreetingStatus;
 import com.example.greeting.repository.GreetingRepository;
 
 /**
- * 登録、一覧取得、未処理レコードの更新を行う。
+ * 登録、一覧取得、削除、未処理レコードの更新を行う。
  */
 @Service
 public class GreetingService {
@@ -42,6 +43,16 @@ public class GreetingService {
         }
         Greeting greeting = new Greeting(trimmed, OffsetDateTime.now(clock));
         return GreetingResponse.from(greetingRepository.save(greeting));
+    }
+
+    /**
+     * 指定したIDのレコードを物理削除する。
+     */
+    @Transactional
+    public void delete(final Long id) {
+        Greeting greeting = greetingRepository.findById(id)
+                .orElseThrow(() -> new GreetingNotFoundException("指定したデータは見つかりません。"));
+        greetingRepository.delete(greeting);
     }
 
     @Transactional(readOnly = true)

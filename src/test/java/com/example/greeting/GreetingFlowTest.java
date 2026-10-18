@@ -2,6 +2,7 @@ package com.example.greeting;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -198,13 +199,58 @@ class GreetingFlowTest {
     }
 
     @Test
+    @DisplayName("処理済みの名前を物理削除すると一覧から消え、他の行は残る")
+    void deleteGreeting() throws Exception {
+        mockMvc.perform(post("/api/greetings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonName("田中")))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/batch/greetings"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/greetings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonName("鈴木")))
+                .andExpect(status().isCreated());
+
+        Long tanakaId = greetingRepository.findAllByOrderByIdAsc().getFirst().getId();
+
+        mockMvc.perform(delete("/api/greetings/" + tanakaId))
+                .andExpect(status().isNoContent());
+
+        assertThat(greetingRepository.findById(tanakaId)).isEmpty();
+        mockMvc.perform(get("/api/greetings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("鈴木"))
+                .andExpect(jsonPath("$[0].status").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("存在しないIDの削除は404になる")
+    void deleteMissingGreeting() throws Exception {
+        mockMvc.perform(delete("/api/greetings/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("指定したデータは見つかりません。"))
+                .andExpect(jsonPath("$.trace").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("数値でないIDの削除は400になる")
+    void deleteInvalidId() throws Exception {
+        mockMvc.perform(delete("/api/greetings/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("IDの形式が正しくありません。"));
+    }
+
+    @Test
     @DisplayName("トップ画面に登録とバッチ実行が表示される")
     void pageShowsControls() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("登録")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("バッチ実行")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("一覧更新")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("一覧更新")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("操作")));
     }
 
     private String jsonName(final String name) {

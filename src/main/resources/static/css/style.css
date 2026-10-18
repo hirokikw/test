@@ -90,6 +90,14 @@ button:disabled {
     cursor: not-allowed;
 }
 
+.delete-button {
+    background: var(--ng);
+}
+
+.delete-button:hover {
+    background: #8d1b13;
+}
+
 .feedback {
     min-height: 1.5em;
     margin: 12px 0 0;

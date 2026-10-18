@@ -11,6 +11,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.example.greeting.api.dto.ApiErrorResponse;
@@ -40,6 +41,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(InvalidGreetingNameException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidName(final InvalidGreetingNameException ex) {
         return ResponseEntity.badRequest().body(new ApiErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(GreetingNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNotFound(final GreetingNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(final MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("IDの形式が正しくありません。"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

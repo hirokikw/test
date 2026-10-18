@@ -1,6 +1,6 @@
 # あいさつメッセージ生成システム
 
-画面で名前を登録すると未処理のデータがDBに保存されます。バッチを実行すると、未処理のデータに「こんにちは、田中さん！」のようなメッセージが付き、画面の一覧に結果が出ます。
+画面で名前を登録すると未処理のデータがDBに保存されます。バッチを実行すると、未処理のデータに「こんにちは、田中さん！」のようなメッセージが付きます。不要になった行は一覧から物理削除できます。
 
 画面 → REST API → DB → Spring Batch → DB → 画面、という流れを1つのSpring Bootアプリで確認するためのサンプルです。
 
@@ -9,7 +9,7 @@
 - Thymeleafで画面の骨組みを返し、データの取得と更新はブラウザの `fetch` からREST APIを呼ぶこと
 - リクエストとレスポンスにDTOを使い、JPAのEntityをAPIの外に出さないこと
 - Bean Validationで入力を検証し、エラーを共通のJSONで返すこと
-- Spring Data JPAで登録と一覧取得をすること
+- Spring Data JPAで登録、一覧取得、物理削除をすること
 - Spring BatchのJob、Step、Taskletで未処理データを更新すること
 - バッチの終了状態を見てからAPIの成功・失敗を返すこと
 
@@ -64,9 +64,10 @@ Spring Boot 4では、Spring MVCのスターター名が `spring-boot-starter-we
 1. 名前に「田中」と入力し、「登録」を押します。一覧に状態「未処理」、メッセージ「未生成」、処理日時「—」で追加されます。
 2. 「バッチ実行」を押します。処理件数1で完了し、一覧が「処理済み」、メッセージ「こんにちは、田中さん！」に変わり、処理日時が表示されます。
 3. もう一度「バッチ実行」を押すと、処理件数0で完了します。処理済みのメッセージと処理日時は変わりません。
-4. 「一覧更新」は、表示されている一覧をAPIから取り直します。
+4. 各行の「削除」を押すと、その行がDBから物理削除され、一覧から消えます。未処理でも処理済みでも削除できます。
+5. 「一覧更新」は、表示されている一覧をAPIから取り直します。
 
-登録、バッチ実行、一覧更新の通信中は、その操作のボタンが無効になり、終わると戻ります。
+登録、バッチ実行、一覧更新、削除の通信中は、その操作のボタンが無効になり、終わると戻ります。
 
 ## REST API
 
@@ -142,6 +143,22 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/batch/greetings
 
 同じバッチが実行中の追加リクエストは `409` です。Jobが失敗したときは `500` と `message` を返し、成功レスポンスにはしません。
 
+### 名前を削除する
+
+`DELETE /api/greetings/{id}`
+
+指定したIDの行を物理削除します。成功時は本文なしの `204 No Content` です。存在しないIDは `404`、数値でないIDは `400` です。
+
+```powershell
+Invoke-RestMethod -Method Delete -Uri http://localhost:8080/api/greetings/1
+```
+
+存在しないIDの例:
+
+```json
+{ "message": "指定したデータは見つかりません。" }
+```
+
 ## 処理の流れと各層の役割
 
 1. ブラウザが `GET /` を開く。`GreetingPageController` がThymeleafのHTMLを返す。
@@ -150,12 +167,13 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/batch/greetings
 4. JobのStepが `GreetingTasklet` を1回実行する。Taskletは `GreetingService` を呼び、`PENDING` だけを「こんにちは、{name}さん！」にして `COMPLETED` と処理日時を保存する。
 5. LauncherがJobの終了状態を確認し、`jobExecutionId`、`status`、今回の処理件数を返す。
 6. 画面が `GET /api/greetings` で一覧を取り直し、状態を「未処理」「処理済み」と表示する。
+7. 「削除」が `DELETE /api/greetings/{id}` を呼ぶ。`GreetingService` が該当行を物理削除し、画面は一覧を取り直す。
 
 | 層 | 役割 |
 | --- | --- |
 | 画面（Thymeleaf + JavaScript） | 入力、操作、結果表示。業務判断はしない |
 | API | HTTPの入口。DTOとステータスコードを担当する |
-| Service | 登録、一覧、未処理の更新。トランザクションの境界 |
+| Service | 登録、一覧、物理削除、未処理の更新。トランザクションの境界 |
 | Repository | `greetings` テーブルへの読み書き |
 | DB | 業務データとSpring Batchのメタデータ |
 | Batch | Job / Step / Tasklet。起動のたびに未処理だけを処理する |
@@ -170,16 +188,16 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/batch/greetings
 | `src/main/resources/templates/index.html` | 画面のHTML |
 | `src/main/resources/static/js/app.js` | `fetch` によるAPI呼び出し |
 | `src/main/resources/static/css/style.css` | 画面の見た目 |
-| `src/main/java/com/example/greeting/api/GreetingApiController.java` | 3つのREST API |
+| `src/main/java/com/example/greeting/api/GreetingApiController.java` | 登録、一覧、削除、バッチ実行のREST API |
 | `src/main/java/com/example/greeting/api/ApiExceptionHandler.java` | 共通のエラーJSON |
-| `src/main/java/com/example/greeting/service/GreetingService.java` | 登録、一覧、未処理の更新 |
+| `src/main/java/com/example/greeting/service/GreetingService.java` | 登録、一覧、物理削除、未処理の更新 |
 | `src/main/java/com/example/greeting/domain/Greeting.java` | 業務テーブルのEntity |
 | `src/main/java/com/example/greeting/repository/GreetingRepository.java` | Spring Data JPA |
 | `src/main/java/com/example/greeting/batch/GreetingBatchConfig.java` | JobとStep |
 | `src/main/java/com/example/greeting/batch/GreetingTasklet.java` | 未処理レコードの更新 |
 | `src/main/java/com/example/greeting/batch/GreetingBatchLauncher.java` | 同期実行、並行実行の防止、結果の判定 |
 | `src/main/resources/application.properties` | H2、テーブル作成、起動時のJob無効化 |
-| `src/test/java/com/example/greeting/GreetingFlowTest.java` | 登録とバッチの自動テスト |
+| `src/test/java/com/example/greeting/GreetingFlowTest.java` | 登録、削除、バッチの自動テスト |
 
 ## 制約
 
